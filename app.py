@@ -1,6 +1,9 @@
 # app.py
 
+import os
 import pickle
+import subprocess
+import sys
 import pandas as pd
 import streamlit as st
 
@@ -8,12 +11,24 @@ st.set_page_config(page_title="CreditWise - Loan Approval Predictor", page_icon=
 
 
 # -----------------------------------------------------------
-# Load the trained model and all the preprocessing tools
+# Load the trained model and all the preprocessing tools.
+#
+# The model/ folder is left out of GitHub on purpose (see
+# .gitignore) because the .pkl files can be trained fresh from
+# data/loan_approval_data.csv, which IS on GitHub. So the very
+# first time this app runs (for example, right after deploying
+# on Streamlit Cloud) there won't be a model/ folder yet. If
+# that happens, we simply run train_model.py ourselves, once,
+# right here, before loading anything.
 # -----------------------------------------------------------
 def load_file(filename):
     with open("model/" + filename, "rb") as f:
         return pickle.load(f)
 
+
+if not os.path.exists("model/best_model.pkl"):
+    with st.spinner("Setting up the app for the first time - training the model, this takes about 30 seconds..."):
+        subprocess.run([sys.executable, "train_model.py"], check=True)
 
 try:
     best_model = load_file("best_model.pkl")
@@ -73,7 +88,7 @@ st.header("Step 1: Enter Applicant Details")
 col1, col2 = st.columns(2)
 
 with col1:
-    age = st.number_input("Applicant's Age (in years)", min_value=20, max_value=100, value=30)
+    age = st.number_input("Applicant's Age (in years)", min_value=18, max_value=100, value=30)
 
     gender = st.selectbox("Applicant's Gender", ["Male", "Female"])
 
@@ -192,9 +207,9 @@ if check_button:
     st.header("Result")
 
     if prediction == 1:
-        st.success("This Loan application is likely to be **APPROVED** ✅")
+        st.success("This application is likely to be **APPROVED** ✅")
     else:
-        st.error("This Loan application is likely to be **REJECTED** ❌")
+        st.error("This application is likely to be **REJECTED** ❌")
 
     result_col1, result_col2 = st.columns(2)
     with result_col1:
