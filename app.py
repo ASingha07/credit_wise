@@ -1,4 +1,13 @@
 # app.py
+#
+# This is the frontend (the webpage) for the CreditWise loan approval
+# predictor. It loads the best model that train_model.py already
+# trained and saved, takes the applicant's details from a simple form,
+# and tells the user whether the loan is likely to be Approved or
+# Rejected.
+#
+# How to run this file: streamlit run app.py
+# (Make sure you already ran train_model.py at least once before this)
 
 import os
 import pickle
@@ -67,6 +76,8 @@ st.write(
     2. Click the **"Check Loan Approval"** button at the bottom.
     3. See the prediction and how confident the model is.
 
+    This is only for learning and demonstration purposes. It should
+    not be used to make a real financial decision.
     """
 )
 
@@ -148,9 +159,8 @@ check_button = st.button("Check Loan Approval", use_container_width=True, type="
 # -----------------------------------------------------------
 if check_button:
 
-    # the model was trained using Loan_Term in months, but the form asks
-    # for years (easier for a person to understand), so convert it here
-    loan_term_months = loan_term * 12
+    # NOTE: the current dataset already stores Loan_Term in years (1-10),
+    # so we send the form's value straight through with no conversion
 
     # put the form answers into one row of a table, just like the training data
     applicant_row = pd.DataFrame([{
@@ -166,7 +176,7 @@ if check_button:
         "Savings": savings,
         "Collateral_Value": collateral_value,
         "Loan_Amount": loan_amount,
-        "Loan_Term": loan_term_months,
+        "Loan_Term": loan_term,
         "Loan_Purpose": loan_purpose,
         "Property_Area": property_area,
         "Education_Level": education_level,
@@ -201,7 +211,10 @@ if check_button:
     prediction_probabilities = best_model.predict_proba(applicant_row_scaled)[0]
     approval_chance = prediction_probabilities[1] * 100
     rejection_chance = prediction_probabilities[0] * 100
-    prediction = 1 if prediction_probabilities[1] >= best_threshold else 0
+
+    # simple, easy-to-understand rule: if the model's approval chance is
+    # under 50%, the loan is rejected. Over 50%, it is approved.
+    prediction = 1 if approval_chance >= 50 else 0
 
     st.divider()
     st.header("Result")
@@ -217,3 +230,8 @@ if check_button:
     with result_col2:
         st.metric("Chance of Rejection", f"{rejection_chance:.1f}%")
 
+    st.caption(
+        "This is a prediction made by a machine learning model based on "
+        "patterns in past data. It is not a guaranteed outcome and should "
+        "not replace a real loan officer's decision."
+    )
