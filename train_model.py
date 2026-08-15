@@ -12,35 +12,29 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 
 
-# -----------------------------------------------------------
 # STEP 1: Load the data
-# -----------------------------------------------------------
+
 print("Step 1: Loading dataset...")
 data = pd.read_csv("data/loan_approval_data.csv")
 
-# Applicant_ID is just a serial number, it does not help prediction
+# Remove Applicant_ID 
 data = data.drop(columns=["Applicant_ID"])
 
-# Some rows have no value in Loan_Approved (the answer we are trying
-# to predict). We cannot use those rows for training because we don't
-# know the correct answer for them, so we simply remove them.
+
 before_rows = len(data)
 data = data.dropna(subset=["Loan_Approved"])
 print("Removed", before_rows - len(data), "rows that had no Loan_Approved value.")
 
 
-# -----------------------------------------------------------
 # STEP 2: Split into train and test BEFORE doing any cleaning
-# -----------------------------------------------------------
-# We split first and clean after, so that information from the test
-# rows never "leaks" into the numbers we use to fill missing values.
+
+# split and clean data
 print("Step 2: Splitting into train and test sets...")
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
 
 
-# -----------------------------------------------------------
 # STEP 3: Fill missing values (imputation)
-# -----------------------------------------------------------
+
 print("Step 3: Filling missing values...")
 
 number_columns = train_data.drop(columns=["Loan_Approved"]).select_dtypes(include="number").columns.tolist()
@@ -59,23 +53,23 @@ test_data[number_columns] = number_filler.transform(test_data[number_columns])
 test_data[text_columns] = text_filler.transform(test_data[text_columns])
 
 
-# -----------------------------------------------------------
+
 # STEP 4: Encode text columns into numbers
-# -----------------------------------------------------------
+
 print("Step 4: Encoding categorical columns...")
 
-# Education_Level has only 2 options, so a simple label encoder works fine
+# Label Encode Education_Level
 education_encoder = LabelEncoder()
 train_data["Education_Level"] = education_encoder.fit_transform(train_data["Education_Level"])
 test_data["Education_Level"] = education_encoder.transform(test_data["Education_Level"])
 
-# Loan_Approved is our target column (Yes/No), turn it into 1/0
+# Loan_Approved is target column (Yes/No), turn it into 1/0
 target_encoder = LabelEncoder()
 train_data["Loan_Approved"] = target_encoder.fit_transform(train_data["Loan_Approved"])
 test_data["Loan_Approved"] = target_encoder.transform(test_data["Loan_Approved"])
 
-# These columns have more than 2 categories with no natural order,
-# so we use one-hot encoding for them
+
+# one-hot encoding
 onehot_columns = [
     "Employment_Status",
     "Marital_Status",
@@ -103,30 +97,30 @@ train_data = pd.concat([train_data.drop(columns=onehot_columns), train_onehot], 
 test_data = pd.concat([test_data.drop(columns=onehot_columns), test_onehot], axis=1)
 
 
-# -----------------------------------------------------------
+
 # STEP 5: Split features (X) and target (y)
-# -----------------------------------------------------------
+
 X_train = train_data.drop(columns=["Loan_Approved"])
 y_train = train_data["Loan_Approved"]
 X_test = test_data.drop(columns=["Loan_Approved"])
 y_test = test_data["Loan_Approved"]
 
-# remember the exact column order, the app will need to match this later
+
 feature_columns = list(X_train.columns)
 
 
-# -----------------------------------------------------------
+
 # STEP 6: Scale the features
-# -----------------------------------------------------------
+
 print("Step 5: Scaling features...")
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 
-# -----------------------------------------------------------
+
 # STEP 7: Train all 3 models and compare them
-# -----------------------------------------------------------
+
 print("Step 6: Training all 3 models and testing different decision thresholds...")
 print()
 
@@ -146,7 +140,7 @@ MIN_ACCURACY = 0.75
 TARGET_PRECISION_LOW = 0.85
 TARGET_PRECISION_HIGH = 0.90
 
-all_results = []          # every model + threshold combo we tried that passed the floors
+all_results = []          # every model + threshold combo to tried that passed the floors
 trained_models = {}       # actual trained model objects, keyed by model name
 
 for model_name, model in models_to_try.items():
@@ -155,7 +149,7 @@ for model_name, model in models_to_try.items():
 
     approval_probabilities = model.predict_proba(X_test_scaled)[:, 1]
 
-    # try many thresholds from 0.05 to 0.95 and see what each one gives us
+    
     threshold = 0.05
     while threshold < 0.95:
         predictions_at_threshold = (approval_probabilities >= threshold).astype(int)
@@ -164,7 +158,7 @@ for model_name, model in models_to_try.items():
         prec = precision_score(y_test, predictions_at_threshold, zero_division=0)
         rec = recall_score(y_test, predictions_at_threshold, zero_division=0)
 
-        # only keep this combo if it respects our hard floors
+        
         if rec >= MIN_RECALL and acc >= MIN_ACCURACY:
             all_results.append({
                 "Model": model_name,
@@ -179,8 +173,7 @@ for model_name, model in models_to_try.items():
 results_df = pd.DataFrame(all_results)
 
 if len(results_df) == 0:
-    # nothing at all respected the floors, fall back to plain 0.5 threshold
-    # on whichever model has the best precision, just so the app still works
+    
     print("WARNING: No model/threshold combination kept recall and accuracy")
     print("above 75%. Falling back to the default 0.5 threshold.")
     fallback_rows = []
@@ -195,16 +188,14 @@ if len(results_df) == 0:
     results_df = pd.DataFrame(fallback_rows)
     results_df = results_df.sort_values(by="Precision", ascending=False)
 else:
-    # among everything that respected the floors, prefer combos whose
-    # precision actually lands inside our 85-90% target band
+    
     in_target_band = results_df[
         (results_df["Precision"] >= TARGET_PRECISION_LOW) & (results_df["Precision"] <= TARGET_PRECISION_HIGH)
     ]
     if len(in_target_band) > 0:
         results_df = in_target_band.sort_values(by="Precision", ascending=False)
     else:
-        # target band was not reachable, so just take the highest precision
-        # we could get while still respecting the recall/accuracy floors
+        
         results_df = results_df.sort_values(by="Precision", ascending=False)
 
 best_row = results_df.iloc[0]
@@ -221,9 +212,9 @@ print("  Recall:    ", round(best_row["Recall"], 4))
 print()
 
 
-# -----------------------------------------------------------
+
 # STEP 9: Save everything the app needs
-# -----------------------------------------------------------
+
 print("Step 7: Saving the best model and all preprocessing tools...")
 
 import os

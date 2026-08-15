@@ -1,13 +1,4 @@
 # app.py
-#
-# This is the frontend (the webpage) for the CreditWise loan approval
-# predictor. It loads the best model that train_model.py already
-# trained and saved, takes the applicant's details from a simple form,
-# and tells the user whether the loan is likely to be Approved or
-# Rejected.
-#
-# How to run this file: streamlit run app.py
-# (Make sure you already ran train_model.py at least once before this)
 
 import os
 import pickle
@@ -19,17 +10,8 @@ import streamlit as st
 st.set_page_config(page_title="CreditWise - Loan Approval Predictor", page_icon="🏦", layout="centered")
 
 
-# -----------------------------------------------------------
 # Load the trained model and all the preprocessing tools.
-#
-# The model/ folder is left out of GitHub on purpose (see
-# .gitignore) because the .pkl files can be trained fresh from
-# data/loan_approval_data.csv, which IS on GitHub. So the very
-# first time this app runs (for example, right after deploying
-# on Streamlit Cloud) there won't be a model/ folder yet. If
-# that happens, we simply run train_model.py ourselves, once,
-# right here, before loading anything.
-# -----------------------------------------------------------
+
 def load_file(filename):
     with open("model/" + filename, "rb") as f:
         return pickle.load(f)
@@ -58,26 +40,22 @@ except FileNotFoundError:
     model_loaded = False
 
 
-# -----------------------------------------------------------
 # Title and simple explanation of what this app does
-# -----------------------------------------------------------
+
 st.title("🏦 CreditWise: Loan Approval Predictor")
 
 st.write(
     """
-    **What is this?**
     This is a simple tool that predicts whether a bank loan application
     would likely be **Approved** or **Rejected**. It was trained on
     past loan records using machine learning, so it recognizes patterns
     from real historical decisions.
 
-    **What should I do?**
+    **Steps**
     1. Fill in the applicant's details in the form below.
     2. Click the **"Check Loan Approval"** button at the bottom.
     3. See the prediction and how confident the model is.
 
-    This is only for learning and demonstration purposes. It should
-    not be used to make a real financial decision.
     """
 )
 
@@ -91,15 +69,14 @@ if not model_loaded:
 st.divider()
 
 
-# -----------------------------------------------------------
-# The input form (using full, easy to understand field names)
-# -----------------------------------------------------------
+# The input form 
+
 st.header("Step 1: Enter Applicant Details")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    age = st.number_input("Applicant's Age (in years)", min_value=18, max_value=100, value=30)
+    age = st.number_input("Applicant's Age (in years)", min_value=20, max_value=100, value=30)
 
     gender = st.selectbox("Applicant's Gender", ["Male", "Female"])
 
@@ -127,11 +104,11 @@ with col1:
     )
 
 with col2:
-    applicant_income = st.number_input("Applicant's Monthly Income", min_value=15000.0, max_value=300000.0, value=50000.0, step=1000.0)
+    applicant_income = st.number_input("Applicant's Monthly Income", min_value=5000.0, max_value=300000.0, value=30000.0, step=1000.0)
 
     coapplicant_income = st.number_input("Co-Applicant's Monthly Income (enter 0 if none)", min_value=0.0, max_value=150000.0, value=0.0, step=1000.0)
 
-    loan_amount = st.number_input("Total Loan Amount Being Requested", min_value=50000.0, max_value=5000000.0, value=500000.0, step=10000.0)
+    loan_amount = st.number_input("Total Loan Amount Being Requested", min_value=30000.0, max_value=5000000.0, value=100000.0, step=10000.0)
 
     loan_term = st.selectbox("Loan Repayment Term (in years)", list(range(1, 11)), index=4)
 
@@ -140,8 +117,7 @@ with col2:
     credit_score = st.number_input("Applicant's Credit Score", min_value=300, max_value=900, value=650)
 
     debt_to_income_percent = st.number_input("Debt-to-Income Ratio (percentage of income already going to debt)", min_value=10.0, max_value=60.0, value=30.0)
-    # the model was trained on this as a fraction (0.10 to 0.60), not a
-    # percentage (10 to 60), so we convert it here before using it
+   
     debt_to_income_ratio = debt_to_income_percent / 100
 
     savings = st.number_input("Applicant's Total Savings", min_value=0.0, max_value=1000000.0, value=100000.0, step=5000.0)
@@ -153,16 +129,11 @@ st.header("Step 2: Get the Prediction")
 check_button = st.button("Check Loan Approval", use_container_width=True, type="primary")
 
 
-# -----------------------------------------------------------
-# When the button is clicked: prepare the data the same way
-# train_model.py did, then ask the model for a prediction
-# -----------------------------------------------------------
+# Submit button 
+
 if check_button:
 
-    # NOTE: the current dataset already stores Loan_Term in years (1-10),
-    # so we send the form's value straight through with no conversion
-
-    # put the form answers into one row of a table, just like the training data
+    # put the form answers into one row of a table
     applicant_row = pd.DataFrame([{
         "Applicant_Income": applicant_income,
         "Coapplicant_Income": coapplicant_income,
@@ -184,15 +155,15 @@ if check_button:
         "Employer_Category": employer_category,
     }])
 
-    # fill missing values (won't really do anything here since the form
-    # always has values, but we use the same tools for consistency)
+    # fill missing values 
+
     applicant_row[number_columns] = number_filler.transform(applicant_row[number_columns])
     applicant_row[text_columns] = text_filler.transform(applicant_row[text_columns])
 
-    # encode Education_Level the same way as training
+    # encode Education_Level 
     applicant_row["Education_Level"] = education_encoder.transform(applicant_row["Education_Level"])
 
-    # one-hot encode the other text columns the same way as training
+    # one-hot encode the other text columns 
     onehot_columns = ["Employment_Status", "Marital_Status", "Loan_Purpose", "Property_Area", "Gender", "Employer_Category"]
     onehot_result = pd.DataFrame(
         onehot_encoder.transform(applicant_row[onehot_columns]),
@@ -200,20 +171,18 @@ if check_button:
     )
     applicant_row = pd.concat([applicant_row.drop(columns=onehot_columns), onehot_result], axis=1)
 
-    # make sure the columns are in the exact same order the model expects
+    
     applicant_row = applicant_row.reindex(columns=feature_columns, fill_value=0)
 
-    # scale the numbers the same way as training
+    # scale the numbers 
     applicant_row_scaled = scaler.transform(applicant_row)
 
-    # ask the model for a prediction, using the threshold that
-    # train_model.py picked (not just the default 50%)
+    # ask the model for a prediction
     prediction_probabilities = best_model.predict_proba(applicant_row_scaled)[0]
     approval_chance = prediction_probabilities[1] * 100
     rejection_chance = prediction_probabilities[0] * 100
 
-    # simple, easy-to-understand rule: if the model's approval chance is
-    # under 50%, the loan is rejected. Over 50%, it is approved.
+
     prediction = 1 if approval_chance >= 50 else 0
 
     st.divider()
@@ -230,8 +199,3 @@ if check_button:
     with result_col2:
         st.metric("Chance of Rejection", f"{rejection_chance:.1f}%")
 
-    st.caption(
-        "This is a prediction made by a machine learning model based on "
-        "patterns in past data. It is not a guaranteed outcome and should "
-        "not replace a real loan officer's decision."
-    )
