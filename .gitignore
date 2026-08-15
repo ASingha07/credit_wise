@@ -1,0 +1,29 @@
+# Python cache files
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+env/
+
+# The trained model files - these get created automatically when you
+# run train_model.py, so there is no need to upload them to GitHub
+model/*.pkl
+
+# Streamlit local settings
+.streamlit/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment variables
+.env
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor settings
+.vscode/
+.idea/
